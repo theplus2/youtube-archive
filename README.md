@@ -51,6 +51,7 @@ pip install -r requirements.txt
 | :--- | :--- |
 | `.claude/skills/youtube-archive/SKILL.md` | 워크플로와 규칙 (Claude가 읽는 지침) |
 | `scripts/yt_fetch.py` | 메타데이터·자막 추출 → `work/<ID>/` |
+| `scripts/clean_transcript.py` | 전문 교정: 자막 청크 분할(`prep`) · 교정본 누락 검사(`check`) |
 | `scripts/build_doc.py` | `content.json` → 서식이 고정된 `doc.html` |
 | `config/categories.json` | 14대 카테고리, Drive 폴더 ID 캐시 |
 | `work/` | 작업 산출물 (git 제외) |
@@ -76,5 +77,6 @@ python3 scripts/build_doc.py work/VIDEO_ID
   텍스트를 붙여넣어 `--transcript-file`로 넘긴다.
 - **Gemini 받아쓰기는 원문 자막이 아니다.** 누락·오기·환각이 있을 수 있어 문서에 경고가 자동 표기된다.
   긴 영상은 20분 단위로 나눠 받아쓰며, 구간 경계에서 문장이 끊기거나 겹칠 수 있다.
-- 자동 생성 자막은 고유명사·전문용어 오인식이 있다. 문서 상단에 전사 출처가 표기된다.
+- 자동 생성 자막은 고유명사·전문용어 오인식이 있다. 전문은 Claude가 문맥으로 교정하지만 완벽하지 않으므로,
+  확신 없는 곳은 `(?)`·`[불명확]`으로 남기고 문단마다 원본 영상 시각 링크를 단다.
 - HTML → Google Docs 변환은 Drive가 수행하며 일부 CSS는 유실될 수 있다.
