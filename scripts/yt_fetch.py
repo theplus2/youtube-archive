@@ -69,7 +69,14 @@ def meta_ytdlp(vid: str):
     for attempt in range(3):
         try:
             with yt_dlp.YoutubeDL(opts) as ydl:
-                return ydl.extract_info(f"https://www.youtube.com/watch?v={vid}", download=False), None
+                info = ydl.extract_info(f"https://www.youtube.com/watch?v={vid}", download=False)
+            # 봇 차단 시 yt-dlp는 오류 대신 빈 껍데기(제목 'youtube video #ID', 자막·길이 없음)를 돌려준다.
+            # 이를 성공으로 보면 "자막 트랙 없음"으로 오판하므로 실패로 처리한다.
+            if not info.get("duration") or str(info.get("title", "")).startswith("youtube video #"):
+                err = "봇 차단으로 불완전한 응답(제목·길이·자막 정보 없음)"
+                time.sleep(2 * (attempt + 1))
+                continue
+            return info, None
         except Exception as e:  # noqa: BLE001
             err = str(e).splitlines()[0][:300]
             opts.pop("js_runtimes", None)  # 구버전 호환
@@ -213,9 +220,17 @@ def find_watch_script():
     return hits[0] if hits else None
 
 
-def gemini_key_available() -> bool:
+def gemini_env():
+    """watch는 GEMINI_API_KEY만 읽는다. Google SDK 관례상 GOOGLE_API_KEY로 등록된 키도 넘겨준다."""
     import os
-    if os.environ.get("GEMINI_API_KEY", "").strip():
+    env = dict(os.environ)
+    if not env.get("GEMINI_API_KEY", "").strip() and env.get("GOOGLE_API_KEY", "").strip():
+        env["GEMINI_API_KEY"] = env["GOOGLE_API_KEY"]
+    return env
+
+
+def gemini_key_available() -> bool:
+    if gemini_env().get("GEMINI_API_KEY", "").strip():
         return True
     for p in (Path.home() / ".config" / "watch" / ".env", Path.cwd() / ".env"):
         if p.exists() and re.search(r"^\s*GEMINI_API_KEY\s*=\s*\S+", p.read_text(encoding="utf-8"), re.M):
@@ -250,11 +265,19 @@ def subs_gemini(url: str, duration):
             cmd += ["--start", hms(start), "--end", hms(end)]
             q += f" This excerpt covers {hms(start)}–{hms(end)} of the full video."
         print(f"[gemini] {hms(start)}~ 받아쓰는 중…", file=sys.stderr)
-        try:
-            r = subprocess.run(cmd + ["--question", q], capture_output=True, text=True, timeout=1200)
-        except subprocess.TimeoutExpired:
-            return (None, "Gemini 시간 초과") if not segs else (None, f"Gemini 시간 초과 ({hms(start)} 구간)")
-        text, err = _gemini_answer(r.stdout)
+        text, err = None, None
+        for attempt in range(4):  # 503 과부하·연결 끊김은 일시적이므로 간격을 늘려 재시도
+            try:
+                r = subprocess.run(cmd + ["--question", q], capture_output=True, text=True, timeout=1200,
+                                   env=gemini_env())
+            except subprocess.TimeoutExpired:
+                return None, f"Gemini 시간 초과 ({hms(start)} 구간)"
+            text, err = _gemini_answer(r.stdout)
+            if text or not err or not re.search(r"Gemini (service|network)", err):
+                break
+            wait = 30 * (attempt + 1)
+            print(f"[gemini] 일시 오류, {wait}초 후 재시도: {err[:120]}", file=sys.stderr)
+            time.sleep(wait)
         chunk = parse_timestamped(text) if text else []
         if not chunk:
             if start > 0 and segs:  # 영상 끝을 지난 구간 → 정상 종료
