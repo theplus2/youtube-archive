@@ -11,7 +11,10 @@ Google Drive `YouTube지식 통합아카이빙` 폴더에 저장하는 Claude Co
 https://www.youtube.com/watch?v=... 요약해서 아카이빙해줘        ← Mode B (기본)
 https://youtu.be/... 전문 텍스트로 정리해줘                     ← Mode A
 https://youtu.be/... 전문과 시각화 자료 둘 다                   ← 듀얼
+https://www.youtube.com/playlist?list=... 재생목록 전체 아카이빙해줘 ← 영상마다 문서 1개
 ```
+
+재생목록은 영상 목록을 먼저 받아 처리할 영상 수와 이미 아카이빙된 영상을 알려 준 뒤, 확인을 받고 영상마다 문서를 하나씩 만든다.
 
 필요 조건: Google Drive 커넥터 연결, 네트워크 정책이 `youtube.com` · `pypi.org` · `generativelanguage.googleapis.com` 허용.
 선택: `watch` 스킬 + 환경 설정에 `GEMINI_API_KEY` 등록(YouTube 차단 시 Gemini가 대신 받아쓰기).
@@ -69,6 +72,10 @@ python3 scripts/yt_fetch.py "https://www.youtube.com/watch?v=VIDEO_ID"
 
 ```bash
 python3 scripts/build_doc.py work/VIDEO_ID
+```
+
+```bash
+python3 scripts/yt_fetch.py --list "https://www.youtube.com/playlist?list=LIST_ID"   # 재생목록 → work/playlist_<ID>.json
 ```
 
 ## 알려진 한계

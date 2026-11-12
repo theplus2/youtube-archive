@@ -4,6 +4,11 @@
 사용법:
     python3 scripts/yt_fetch.py <유튜브 URL 또는 VIDEO_ID> [--out work] [--lang ko]
     python3 scripts/yt_fetch.py <URL> --transcript-file 붙여넣은자막.txt   # 수동 자막 사용
+    python3 scripts/yt_fetch.py --list <재생목록 URL>                      # 재생목록 → 영상 목록만 출력
+
+재생목록 모드 (--list):
+    자막은 받지 않고 영상 목록만 work/playlist_<LIST_ID>.json에 저장·출력한다.
+    비공개·삭제된 영상은 제외하고 skipped에 남긴다. 각 영상은 이 스크립트로 따로 처리한다.
 
 산출물 (work/<VIDEO_ID>/):
     meta.json        제목·채널·길이·챕터·자막 출처
@@ -14,6 +19,7 @@
     transcript.txt   [HH:MM:SS] 약 20초 단위로 묶은 읽기용 텍스트
 
 종료 코드: 0 성공 / 2 메타데이터 실패 / 3 자막 확보 실패(메타데이터는 저장됨)
+          4 재생목록 URL을 --list 없이 넘김 / 5 재생목록 목록 확보 실패
 """
 import argparse
 import json
@@ -27,11 +33,26 @@ from pathlib import Path
 
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
 ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
+LIST_RE = re.compile(r"^[A-Za-z0-9_-]{12,}$")
+UNAVAILABLE = ("[Private video]", "[Deleted video]", "[비공개 동영상]", "[삭제된 동영상]")
+
+
+def playlist_id(src: str):
+    """URL의 list= 값. 없으면 None. 재생목록 ID 자체를 넘겨도 된다."""
+    if LIST_RE.match(src):
+        return src
+    lid = urllib.parse.parse_qs(urllib.parse.urlparse(src).query).get("list", [""])[0]
+    return lid if LIST_RE.match(lid) else None
 
 
 def video_id(src: str) -> str:
     if ID_RE.match(src):
         return src
+    u0 = urllib.parse.urlparse(src)
+    if playlist_id(src) and not urllib.parse.parse_qs(u0.query).get("v")             and not (u0.hostname or "").endswith("youtu.be"):
+        print(f"재생목록 URL입니다. 영상 목록은 --list로 받으세요: python3 scripts/yt_fetch.py --list \"{src}\"",
+              file=sys.stderr)
+        sys.exit(4)
     u = urllib.parse.urlparse(src)
     if u.hostname and u.hostname.endswith("youtu.be"):
         cand = u.path.strip("/").split("/")[0]
@@ -91,6 +112,51 @@ def meta_oembed(vid: str):
         return {"title": d.get("title"), "channel": d.get("author_name")}
     except Exception:
         return None
+
+
+# ---------- 재생목록 ----------
+
+def list_playlist(lid: str, out_dir: Path):
+    try:
+        import yt_dlp
+    except ImportError:
+        sys.exit("yt-dlp 미설치 (pip install -r requirements.txt)")
+    opts = {"quiet": True, "no_warnings": True, "skip_download": True, "extract_flat": "in_playlist"}
+    info, err = None, None
+    for attempt in range(3):
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(f"https://www.youtube.com/playlist?list={lid}", download=False)
+            if info and info.get("entries") is not None:
+                break
+            err = "빈 응답"
+        except Exception as e:  # noqa: BLE001
+            err = str(e).splitlines()[0][:300]
+        info = None
+        time.sleep(2 * (attempt + 1))
+    if not info:
+        print(f"[실패] 재생목록을 가져오지 못했습니다: {err}", file=sys.stderr)
+        sys.exit(5)
+
+    entries, skipped, seen = [], [], set()
+    for i, e in enumerate(info.get("entries") or [], 1):
+        vid, title = (e or {}).get("id"), (e or {}).get("title") or ""
+        if not vid or not ID_RE.match(vid) or title in UNAVAILABLE or vid in seen:
+            skipped.append({"index": i, "video_id": vid, "title": title or None,
+                            "reason": "중복" if vid in seen else "비공개·삭제 또는 ID 없음"})
+            continue
+        seen.add(vid)
+        entries.append({"index": i, "video_id": vid, "title": title, "duration": e.get("duration"),
+                        "url": f"https://www.youtube.com/watch?v={vid}"})
+    result = {"playlist_id": lid, "title": info.get("title"),
+              "channel": info.get("channel") or info.get("uploader"),
+              "url": f"https://www.youtube.com/playlist?list={lid}",
+              "count": len(entries), "entries": entries, "skipped": skipped}
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / f"playlist_{lid}.json"
+    path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    print(f"목록 파일: {path}")
 
 
 # ---------- 자막 ----------
@@ -318,6 +384,7 @@ def write_txt(segs, path: Path, window: int = 20):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("source")
+    ap.add_argument("--list", action="store_true", help="재생목록의 영상 목록만 받아 저장 (자막은 받지 않음)")
     ap.add_argument("--out", default="work")
     ap.add_argument("--lang", default=None, help="우선 자막 언어 (기본: 영상 원어 → ko → en)")
     ap.add_argument("--transcript-file", default=None, help="직접 확보한 자막 텍스트 파일")
@@ -325,7 +392,16 @@ def main():
                     help="auto: YouTube 자막 → 실패 시 Gemini / youtube: 자막만 / gemini: 바로 Gemini")
     a = ap.parse_args()
 
+    if a.list:
+        lid = playlist_id(a.source)
+        if not lid:
+            sys.exit(f"재생목록 ID(list=)를 찾을 수 없습니다: {a.source}")
+        list_playlist(lid, Path(a.out))
+        return
+
     vid = video_id(a.source)
+    if playlist_id(a.source):
+        print("[안내] 재생목록 안의 영상 링크입니다. 이 영상 하나만 처리합니다(전체는 --list).", file=sys.stderr)
     out = Path(a.out) / vid
     out.mkdir(parents=True, exist_ok=True)
 
