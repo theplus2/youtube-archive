@@ -33,7 +33,10 @@ description: "[v5.1.0] 유튜브 영상의 자막을 추출해 14대 카테고�
 pip install -q -r requirements.txt
 ```
 
-Gemini 경로를 쓰려면 `GEMINI_API_KEY`가 필요하다. 클라우드 환경 설정(세션 제목 표시줄의 환경 메뉴 → Edit)의
+**로컬 PC 실행이 기본이다.** 클라우드 세션에서는 YouTube 봇 차단 때문에 1·2순위가 거의 실패하므로, 클라우드에서 실패하면 로컬 실행을 먼저 권한다.
+Windows에서는 `python3` 대신 `python`을 쓴다.
+
+Gemini 경로를 쓰려면 `GEMINI_API_KEY`(또는 `GOOGLE_API_KEY`)가 필요하다. 클라우드 환경 설정(세션 제목 표시줄의 환경 메뉴 → Edit)의
 Network secrets 또는 환경 변수에 `GEMINI_API_KEY`로 등록되어 있어야 한다. **키를 채팅으로 받지 않는다.**
 키가 없으면 3순위 경로만 건너뛰고 나머지는 그대로 동작한다.
 

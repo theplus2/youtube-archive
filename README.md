@@ -16,6 +16,35 @@ https://youtu.be/... 전문과 시각화 자료 둘 다                   ← �
 필요 조건: Google Drive 커넥터 연결, 네트워크 정책이 `youtube.com` · `pypi.org` · `generativelanguage.googleapis.com` 허용.
 선택: `watch` 스킬 + 환경 설정에 `GEMINI_API_KEY` 등록(YouTube 차단 시 Gemini가 대신 받아쓰기).
 
+## 로컬 PC에서 실행 (권장)
+
+클라우드 세션은 YouTube가 데이터센터 IP를 봇으로 차단해 자막을 거의 받지 못한다.
+가정·교회 인터넷에서는 원문 자막을 바로 받을 수 있으므로 **로컬 실행을 기본으로 한다.**
+
+1. Python 3.10 이상, Git, [Claude Code](https://code.claude.com) 설치
+2. yt-dlp용 JavaScript 런타임 설치: [Deno](https://deno.com) 권장 (Node.js도 동작)
+3. 저장소 받기
+
+```bash
+git clone -b claude/blissful-goldberg-u0xk3q https://github.com/theplus2/youtube-archive.git
+```
+
+```bash
+cd youtube-archive
+```
+
+```bash
+pip install -r requirements.txt
+```
+
+4. 이 폴더에서 Claude Code를 열고, Google Drive 커넥터가 연결되어 있는지 확인한다
+   (claude.ai 계정으로 로그인하면 claude.ai에 연결한 커넥터를 쓸 수 있다).
+5. 유튜브 URL과 함께 "요약해서 아카이빙해줘"라고 요청한다.
+
+- Windows에서는 명령의 `python3`를 `python`으로 바꿔 실행한다.
+- 자막 트랙이 없는 영상만 Whisper 계열 전사가 필요하다(`watch` 스킬의 WhisperX 등).
+- Gemini 경로는 선택 사항이다. 쓰려면 `GEMINI_API_KEY` 또는 `GOOGLE_API_KEY` 환경 변수를 설정한다.
+
 ## 구조
 
 | 경로 | 역할 |
