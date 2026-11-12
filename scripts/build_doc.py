@@ -201,15 +201,16 @@ def main():
     doc = ('<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8">'
            f"<title>{e(title)}</title></head><body style=\"{FONT}font-size:11pt;\">" + "\n".join(b) + "</body></html>")
     out = work / "doc.html"
-    out.write_text(doc, encoding="utf-8")
-    digest = hashlib.sha256(doc.encode("utf-8")).hexdigest()
+    data = doc.encode("utf-8")
+    out.write_bytes(data)  # write_text는 Windows에서 줄바꿈을 CRLF로 바꿔 해시가 어긋난다
+    digest = hashlib.sha256(data).hexdigest()
     print(json.dumps({
         "title": title,
         "folder": cat["folder"],
         "folder_id": cat["folder_id"],
         "root_id": cats["root"]["id"],
         "html_path": str(out.resolve()),
-        "html_bytes": len(doc.encode("utf-8")),
+        "html_bytes": len(data),
         "file_reference": f"sha256:{digest}:{out.resolve()}",
         "transcript_segments_placed": len(segs) if mode != "B" else None,
     }, ensure_ascii=False, indent=2))

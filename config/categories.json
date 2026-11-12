@@ -6,7 +6,7 @@
   "_note": "folder_id가 null인 카테고리는 드라이브에 아직 폴더가 없다(2026-11-12 확인). 첫 사용 시 스킬 4단계가 루트 아래에 폴더를 만들고 이 파일의 folder_id를 채운다.",
   "categories": [
     {"no": 1,  "name": "신학&교회",          "folder": "1.[신학&교회]",          "folder_id": "1Yw-ejFLOPVdOw3a4rgNq6_K3KQhPcej1", "scope": "교리, 교회사, 성경연구, 현대교회, 구약, 신약, 설교, 기독교 사상"},
-    {"no": 2,  "name": "역사&인문학",        "folder": "2.[역사&인문학]",        "folder_id": null, "scope": "세계사, 한국사, 고고학, 지리, 인류학, 철학, 문학, 인문학"},
+    {"no": 2,  "name": "역사&인문학",        "folder": "2.[역사&인문학]",        "folder_id": "1b_QsYLWp0GXbna8rrdMYRnAord1qbZoZ", "scope": "세계사, 한국사, 고고학, 지리, 인류학, 철학, 문학, 인문학"},
     {"no": 3,  "name": "금융&주식",          "folder": "3.[금융&주식]",          "folder_id": null, "scope": "국내외 주식, ETF, 거시경제, 자산운용, 채권, 차트/매매 전략, 재테크"},
     {"no": 4,  "name": "AI&IT",              "folder": "4.[AI&IT]",              "folder_id": null, "scope": "AI 모델, IT 일반, 프롬프트 엔지니어링, 코딩/개발, 생산성 툴"},
     {"no": 5,  "name": "부동산&건축",        "folder": "5.[부동산&건축]",        "folder_id": null, "scope": "토지, 건축, 인테리어, 부동산 매매, 경매, 공매, 공간 설계"},
