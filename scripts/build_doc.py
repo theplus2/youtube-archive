@@ -16,10 +16,10 @@ content.json 스키마:
   "category": "신학&교회",            # config/categories.json의 name (번호·대괄호 없이)
   "mode": "B",                        # "A" 전문 | "B" 시각화 요약 | "dual" 둘 다
   "summary": {                        # mode B / dual
-    "thesis": ["문단", ...],          # 핵심 명제 (합쳐서 5~7줄)
-    "logic_tree": [{"level": 0, "text": "..."}, {"level": 1, "text": "..."}],
-    "table": {"headers": ["구분", "내용"], "rows": [["...", "..."]]},
-    "points": [{"title": "논점", "start": 400, "items": ["...", "..."]}]   # start(초)는 선택
+    "thesis": ["문단", ...],          # 핵심 명제 (합쳐서 5~7줄) — 요약에서 유일한 본문 텍스트
+    "visuals": [                      # 시각화 요약: 다이어그램 4~7개. 형식은 render_visuals.py 상단 주석 참조
+      {"type": "tree", "title": "제목", "start": 132, "caption": "한 줄 설명(선택)", ...}
+    ]
   },
   "sections": [                       # mode A / dual. 생략하면 챕터 → 5분 단위로 자동 분할
     {"start": 0, "anchor": "그 문단의 첫 말(선택)", "title": "소제목"}
@@ -29,6 +29,7 @@ content.json 스키마:
   "notes": ["문서 상단 '읽기 전에' 상자에 넣을 문구(선택)"]
 }
 """
+import base64
 import datetime
 import hashlib
 import html
@@ -39,9 +40,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import clean_transcript  # noqa: E402
+import render_visuals  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "5.2.0"
+VERSION = "5.4.0"
 
 # ---------- 디자인 토큰 (Google Docs HTML 가져오기에서 살아남는 속성만 사용) ----------
 INK, MUTED, FAINT = "#202124", "#5f6368", "#9aa0a6"
@@ -55,8 +57,8 @@ P = f"{BASE}font-size:11pt;line-height:1.7;text-align:left;margin-top:0;margin-b
 SMALL = f"{FONT}color:{MUTED};font-size:9.5pt;line-height:1.5;margin-top:0;margin-bottom:4pt;"
 KICKER = f"{FONT}color:{ACCENT};font-size:10pt;font-weight:bold;line-height:1.4;margin-top:0;margin-bottom:4pt;"
 H1 = f"{BASE}font-size:19pt;font-weight:bold;line-height:1.35;margin-top:0;margin-bottom:14pt;"
-H2 = f"{FONT}color:{ACCENT};font-size:15pt;font-weight:bold;line-height:1.4;margin-top:26pt;margin-bottom:4pt;"
-H3 = f"{BASE}font-size:12.5pt;font-weight:bold;line-height:1.4;margin-top:18pt;margin-bottom:4pt;"
+H2 = f"{FONT}color:{ACCENT};font-size:15pt;font-weight:bold;line-height:1.4;margin-top:26pt;margin-bottom:4pt;" + "page-break-after:avoid;"  # Docs에서 "다음 문단과 함께 유지"
+H3 = f"{BASE}font-size:12.5pt;font-weight:bold;line-height:1.4;margin-top:18pt;margin-bottom:4pt;" + "page-break-after:avoid;"  # Docs에서 "다음 문단과 함께 유지"
 TABLE = "border-collapse:collapse;width:100%;"
 CELL = f"{BASE}font-size:10pt;line-height:1.5;padding:5pt 8pt;border:1px solid {LINE};vertical-align:top;text-align:left;"
 LABEL = CELL + f"background-color:{ACCENT_BG};color:{MUTED};font-weight:bold;width:20%;"
@@ -233,28 +235,27 @@ def main():
         h2b("핵심 명제")
         b.append(box("".join(f'<p style="{BASE}font-size:11pt;line-height:1.7;margin-top:0;margin-bottom:6pt;">{e(t)}</p>'
                              for t in s["thesis"]), CALLOUT))
-        if s.get("logic_tree"):
-            h2b("핵심 로직 트리")
-            for n in s["logic_tree"]:
-                lv = int(n.get("level", 0))
-                mark = "" if lv == 0 else ("➔ " if lv == 1 else "↳ ")
-                txt = f"<b>{e(n['text'])}</b>" if lv == 0 else e(n["text"])
-                b.append(f'<p style="{P}margin-bottom:4pt;margin-left:{lv * 20}pt;">{mark}{txt}</p>')
-        t = s.get("table")
-        if t:
-            h2b("핵심 요약표")
-            b.append(f'<table style="{TABLE}"><tr>'
-                     + "".join(f'<td style="{TH}">{e(h)}</td>' for h in t["headers"]) + "</tr>"
-                     + "".join("<tr>" + "".join(f'<td style="{CELL}">{e(str(c))}</td>' for c in r) + "</tr>"
-                               for r in t["rows"]) + "</table>")
-        if s.get("points"):
-            h2b("상세 논점")
-            for pt in s["points"]:
-                head = e(pt["title"])
-                if pt.get("start") is not None and has_ts:
-                    head += "  " + link(pt["start"], f"▶ {short(pt['start'], long_video)}", size="10pt")
-                b.append(f'<h3 style="{H3}">{head}</h3>')
-                b.append("<ul>" + "".join(f'<li style="{P}margin-bottom:4pt;">{e(i)}</li>' for i in pt["items"]) + "</ul>")
+        visuals = s.get("visuals") or []
+        if not visuals:
+            legacy = [k for k in ("logic_tree", "table", "points") if s.get(k)]
+            die("mode B/dual에는 summary.visuals(다이어그램)가 필요합니다"
+                + (f" — 예전 텍스트 요약 필드({', '.join(legacy)})는 더 이상 쓰지 않음" if legacy else ""))
+        try:
+            shots = render_visuals.render_all(visuals, work / "visuals")
+        except (ValueError, RuntimeError) as err:
+            die(f"시각화 렌더링 실패: {err}")
+        h2b("시각화 요약")
+        for v, (png, w, hgt) in zip(visuals, shots):
+            head = e(v["title"])
+            if v.get("start") is not None and has_ts:
+                head += "  " + link(v["start"], f"▶ {short(v['start'], long_video)}", size="10pt")
+            b.append(f'<h3 style="{H3}">{head}</h3>')
+            dw = render_visuals.DOC_WIDTH_PX
+            data = base64.b64encode(png.read_bytes()).decode("ascii")
+            b.append(f'<p style="{P}margin-bottom:4pt;"><img src="data:image/png;base64,{data}" '
+                     f'width="{dw}" height="{round(hgt * dw / w)}" alt="{e(v["title"])}"></p>')
+            if v.get("caption"):
+                b.append(p(e(v["caption"]), SMALL + "margin-bottom:12pt;"))
 
     # ---------- Mode A ----------
     if mode in ("A", "dual"):

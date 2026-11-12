@@ -8,7 +8,7 @@ Google Drive `YouTube지식 통합아카이빙` 폴더에 저장하는 Claude Co
 이 저장소를 연 Claude Code 세션에서 유튜브 URL과 함께 요청한다.
 
 ```
-https://www.youtube.com/watch?v=... 요약해서 아카이빙해줘        ← Mode B (기본)
+https://www.youtube.com/watch?v=... 요약해서 아카이빙해줘        ← Mode B (기본, 핵심 명제 + 다이어그램)
 https://youtu.be/... 전문 텍스트로 정리해줘                     ← Mode A
 https://youtu.be/... 전문과 시각화 자료 둘 다                   ← 듀얼
 https://www.youtube.com/playlist?list=... 재생목록 전체 아카이빙해줘 ← 영상마다 문서 1개
@@ -24,7 +24,7 @@ https://www.youtube.com/playlist?list=... 재생목록 전체 아카이빙해줘
 클라우드 세션은 YouTube가 데이터센터 IP를 봇으로 차단해 자막을 거의 받지 못한다.
 가정·교회 인터넷에서는 원문 자막을 바로 받을 수 있으므로 **로컬 실행을 기본으로 한다.**
 
-1. Python 3.10 이상, Git, [Claude Code](https://code.claude.com) 설치
+1. Python 3.10 이상, Git, [Claude Code](https://code.claude.com), Chrome 또는 Edge 설치(요약 다이어그램을 그릴 때 씀)
 2. yt-dlp용 JavaScript 런타임 설치: [Deno](https://deno.com) 권장 (Node.js도 동작)
 3. 저장소 받기
 
@@ -57,6 +57,7 @@ pip install -r requirements.txt
 | `scripts/yt_fetch.py` | 메타데이터·자막 추출 → `work/<ID>/` |
 | `scripts/clean_transcript.py` | 전문 교정: 자막 청크 분할(`prep`) · 교정본 누락 검사(`check`) |
 | `scripts/build_doc.py` | `content.json` → 서식이 고정된 `doc.html` |
+| `scripts/render_visuals.py` | 요약 다이어그램 명세 → PNG (헤드리스 Chrome/Edge) |
 | `config/categories.json` | 14대 카테고리, Drive 폴더 ID 캐시 |
 | `work/` | 작업 산출물 (git 제외) |
 
