@@ -41,7 +41,8 @@ pip install -r requirements.txt
    (claude.ai 계정으로 로그인하면 claude.ai에 연결한 커넥터를 쓸 수 있다).
 5. 유튜브 URL과 함께 "요약해서 아카이빙해줘"라고 요청한다.
 
-- Windows에서는 명령의 `python3`를 `python`으로 바꿔 실행한다.
+- Windows에서는 명령의 `python3`를 `py`로 바꿔 실행한다(`pip install`은 `py -m pip install`).
+  `python`은 Microsoft Store 바로가기라 실행되지 않을 수 있다.
 - 자막 트랙이 없는 영상만 Whisper 계열 전사가 필요하다(`watch` 스킬의 WhisperX 등).
 - Gemini 경로는 선택 사항이다. 쓰려면 `GEMINI_API_KEY` 또는 `GOOGLE_API_KEY` 환경 변수를 설정한다.
 

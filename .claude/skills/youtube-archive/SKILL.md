@@ -40,7 +40,9 @@ pip install -q -r requirements.txt
 ```
 
 **로컬 PC 실행이 기본이다.** 클라우드 세션에서는 YouTube 봇 차단 때문에 1·2순위가 거의 실패하므로, 클라우드에서 실패하면 로컬 실행을 먼저 권한다.
-Windows에서는 `python3` 대신 `python`을 쓴다.
+**Windows에서는 아래 모든 `python3`를 `py`로 바꿔 실행한다**(`py -m pip install -r requirements.txt`도 마찬가지).
+`python`·`python3`는 Microsoft Store 바로가기일 수 있어 실행되지 않는다(종료 코드 49).
+한글 출력이 cp949 오류로 깨지면 명령 앞에 `PYTHONIOENCODING=utf-8`을 붙인다.
 
 Gemini 경로를 쓰려면 `GEMINI_API_KEY`(또는 `GOOGLE_API_KEY`)가 필요하다. 클라우드 환경 설정(세션 제목 표시줄의 환경 메뉴 → Edit)의
 Network secrets 또는 환경 변수에 `GEMINI_API_KEY`로 등록되어 있어야 한다. **키를 채팅으로 받지 않는다.**
