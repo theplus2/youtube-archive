@@ -111,7 +111,8 @@ def main():
     has_ts = tr.get("has_timestamps", True)
 
     kind = {"manual": "제작자 등록 자막", "auto": "유튜브 자동 생성 자막(오인식 가능)",
-            "user-supplied": "사용자 제공 전사"}.get(tr.get("kind"), "없음")
+            "user-supplied": "사용자 제공 전사",
+            "gemini": "Gemini AI 받아쓰기(원문 자막 아님 · 검증 필요)"}.get(tr.get("kind"), "없음")
     mode_label = {"A": "Mode A · 전문 텍스트", "B": "Mode B · 시각화 요약", "dual": "듀얼 통합 (요약 + 전문)"}[mode]
     rows = [
         ("영상 출처", f'<a href="{watch}">{watch}</a>'),
@@ -128,7 +129,6 @@ def main():
          + "</table>"]
     for n in content.get("notes") or []:
         b.append(p(f"<b>⚠️ {e(n)}</b>"))
-    b.append(f'<p style="{P}text-align:center;"><img src="{meta["thumbnail"]}" width="560" /></p>')
 
     # ---------- Mode B ----------
     if mode in ("B", "dual"):
@@ -167,16 +167,19 @@ def main():
         if tr.get("kind") == "auto":
             b.append(p("※ 유튜브 자동 생성 자막을 그대로 옮긴 것입니다. 고유명사·전문용어 오인식이 있을 수 있으니 인용 전 원본 영상을 확인하십시오.",
                        P + "color:#5f6368;font-size:10pt;"))
-        secs = content.get("sections") or [{"start": c["start"], "title": c["title"]} for c in meta.get("chapters") or []]
+        if tr.get("kind") == "gemini":
+            cov = tr.get("coverage")
+            cov_txt = f" 영상 길이 대비 전사 범위 약 {int(cov * 100)}%." if cov is not None else ""
+            b.append(p("※ 원문 자막이 아니라 Gemini AI가 영상을 듣고 받아쓴 텍스트입니다. 누락·오기·없는 말이 섞일 수 있으니 "
+                       "인용 전 반드시 해당 타임스탬프의 원본 영상을 확인하십시오." + cov_txt,
+                       P + "color:#b3261e;font-size:10pt;"))
+        secs =content.get("sections") or [{"start": c["start"], "title": c["title"]} for c in meta.get("chapters") or []]
         if not secs:
             end = segs[-1]["start"] if segs else 0
             secs = [{"start": t, "title": f"구간 {i + 1}"} for i, t in enumerate(range(0, int(end) + 1, 300))]
         secs = sorted(secs, key=lambda x: x["start"])
         if secs[0]["start"] > (segs[0]["start"] if segs else 0):
             secs.insert(0, {"start": 0, "title": "도입"})
-        # hq1~3은 유튜브가 자동 생성한 대표 스틸컷(대략 영상의 1/4·2/4·3/4 지점)으로,
-        # 소제목의 타임스탬프 프레임과 일치하지 않는다. 그래서 그렇게 표기해 도입·중반·후반에만 넣는다.
-        still_at = {0: 1, len(secs) // 2: 2, len(secs) - 1: 3} if len(secs) >= 3 else {0: 1}
         used = 0
         for i, sec in enumerate(secs):
             nxt = secs[i + 1]["start"] if i + 1 < len(secs) else float("inf")
@@ -191,10 +194,6 @@ def main():
                 b.append(f'<table style="{TABLE}"><tr><td style="{BOX}">🎬 {scene}</td></tr></table>')
             else:
                 b.append(f'<h2 style="{H2}">{e(sec["title"])}</h2>')
-            if i in still_at:
-                n = still_at[i]
-                b.append(f'<p style="{P}text-align:center;"><img src="https://img.youtube.com/vi/{vid}/hq{n}.jpg" width="480" /><br/>'
-                         f'<span style="font-size:9pt;color:#5f6368;">유튜브 자동 생성 스틸컷 {n}/3 (위 타임스탬프의 정확한 프레임은 아님)</span></p>')
             b += [p(e(text)) for _, text in paragraphs(chunk)]
         if used != len(segs):
             die(f"전문 누락: 세그먼트 {len(segs)}개 중 {used}개만 배치됨. sections의 start 값을 확인할 것.")

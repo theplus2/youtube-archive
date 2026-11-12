@@ -6,7 +6,10 @@
     python3 scripts/yt_fetch.py <URL> --transcript-file 붙여넣은자막.txt   # 수동 자막 사용
 
 산출물 (work/<VIDEO_ID>/):
-    meta.json        제목·채널·길이·챕터·검증된 썸네일 URL·자막 출처
+    meta.json        제목·채널·길이·챕터·자막 출처
+
+자막 확보 순서 (--via auto):
+    1) yt-dlp 자막  2) youtube-transcript-api  3) watch 스킬의 Gemini 엔진(GEMINI_API_KEY 필요)
     transcript.json  [{"start": 초, "text": "..."}]  원본 세그먼트
     transcript.txt   [HH:MM:SS] 약 20초 단위로 묶은 읽기용 텍스트
 
@@ -45,24 +48,6 @@ def http_get(url: str, timeout: int = 20) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return r.read()
-
-
-def url_ok(url: str) -> bool:
-    try:
-        req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": UA})
-        with urllib.request.urlopen(req, timeout=15) as r:
-            return r.status == 200
-    except Exception:
-        return False
-
-
-def pick_thumbnail(vid: str) -> str:
-    """maxresdefault는 모든 영상에 존재하지 않으므로(없으면 404) 실제 존재하는 것을 고른다."""
-    for name in ("maxresdefault", "sddefault", "hqdefault"):
-        url = f"https://img.youtube.com/vi/{vid}/{name}.jpg"
-        if url_ok(url):
-            return url
-    return f"https://img.youtube.com/vi/{vid}/hqdefault.jpg"
 
 
 def hms(sec: float) -> str:
@@ -173,14 +158,14 @@ def subs_transcript_api(vid: str, want: list):
         return None, f"{type(e).__name__}: {str(e).strip().splitlines()[0][:200] if str(e).strip() else ''}"
 
 
-TS_RE = re.compile(r"^\s*\[?(?:(\d{1,2}):)?(\d{1,2}):(\d{2})\]?\s*(.*)$")
+TS_RE = re.compile(r"^\s*[-*]?\s*\[?(?:(\d{1,2}):)?(\d{1,2}):(\d{2})\]?\s*[-–:]?\s*(.*)$")
 
 
-def subs_from_file(path: str):
-    """사용자가 붙여넣은 자막 파일. 줄 앞의 0:00 / 00:00:00 / [00:00:00] 타임스탬프를 인식한다.
+def parse_timestamped(text: str):
+    """줄 앞의 0:00 / 00:00:00 / [00:00:00] 타임스탬프를 인식해 세그먼트로 만든다.
     유튜브 '스크립트 표시' 복사본처럼 타임스탬프와 문장이 다른 줄에 있어도 된다."""
     segs, cur = [], None
-    for line in Path(path).read_text(encoding="utf-8").splitlines():
+    for line in text.splitlines():
         if not line.strip():
             continue
         m = TS_RE.match(line)
@@ -193,10 +178,104 @@ def subs_from_file(path: str):
         else:
             cur = {"start": 0, "text": line.strip()}
             segs.append(cur)
-    segs = [s for s in segs if s["text"]]
-    has_ts = any(s["start"] > 0 for s in segs)
+    return [s for s in segs if s["text"]]
+
+
+def subs_from_file(path: str):
+    segs = parse_timestamped(Path(path).read_text(encoding="utf-8"))
     return {"segments": segs, "lang": "unknown", "kind": "user-supplied",
-            "via": "file", "has_timestamps": has_ts}
+            "via": "file", "has_timestamps": any(s["start"] > 0 for s in segs)}
+
+
+# ---------- Gemini (watch 스킬 경유) ----------
+# 이 컨테이너가 YouTube에 직접 접속하지 않고, Google의 Gemini가 영상을 보고 받아쓴다.
+# 따라서 YouTube의 봇 차단(403/429)을 우회하지만, 결과는 AI가 생성한 전사이므로
+# 원문 자막과 달리 누락·오기·환각이 있을 수 있다(문서에 출처를 표기한다).
+
+GEMINI_CHUNK = 1200  # 초. 출력 길이 한도 때문에 긴 영상은 20분 단위로 나눠 받아쓴다.
+GEMINI_MAX_CHUNKS = 9  # 최대 3시간
+GEMINI_Q = (
+    "Transcribe ALL speech in this video VERBATIM in the original spoken language. "
+    "Do not summarize, paraphrase, translate, correct, or omit anything. "
+    "Output ONLY transcript lines in the form [HH:MM:SS] text, starting a new line at each sentence "
+    "boundary and at least every 30 seconds. Timestamps must be absolute positions in the full video. "
+    "Write [inaudible] for unclear parts. No headings, no visual descriptions, no commentary before or after."
+)
+
+
+def find_watch_script():
+    env = __import__("os").environ.get("WATCH_SCRIPT")
+    if env and Path(env).is_file():
+        return Path(env)
+    base = Path.home() / ".claude" / "plugins"
+    hits = sorted(base.rglob("skills/watch/scripts/watch.py"), key=lambda p: p.stat().st_mtime, reverse=True) \
+        if base.exists() else []
+    return hits[0] if hits else None
+
+
+def gemini_key_available() -> bool:
+    import os
+    if os.environ.get("GEMINI_API_KEY", "").strip():
+        return True
+    for p in (Path.home() / ".config" / "watch" / ".env", Path.cwd() / ".env"):
+        if p.exists() and re.search(r"^\s*GEMINI_API_KEY\s*=\s*\S+", p.read_text(encoding="utf-8"), re.M):
+            return True
+    return False
+
+
+def _gemini_answer(report: str):
+    if "## Answer (from Gemini)" not in report:
+        errs = re.findall(r"^- (Gemini .+)$", report, re.M)
+        return None, (errs[0] if errs else "Gemini 응답 없음")[:300]
+    body = report.split("## Answer (from Gemini)", 1)[1]
+    lines = [l for l in body.splitlines() if not (l.startswith("_") and l.rstrip().endswith("_"))]
+    return "\n".join(lines).strip(), None
+
+
+def subs_gemini(url: str, duration):
+    import subprocess
+    watch = find_watch_script()
+    if not watch:
+        return None, "watch 스킬(watch.py)을 찾을 수 없음"
+    if not gemini_key_available():
+        return None, "GEMINI_API_KEY 미설정 (SKILL.md '0단계' 참조)"
+    segs, start = [], 0
+    for _ in range(GEMINI_MAX_CHUNKS):
+        if duration and start >= duration:
+            break
+        end = start + GEMINI_CHUNK
+        q = GEMINI_Q
+        cmd = [sys.executable, str(watch), url, "--engine", "gemini"]
+        if not (duration and duration <= GEMINI_CHUNK):
+            cmd += ["--start", hms(start), "--end", hms(end)]
+            q += f" This excerpt covers {hms(start)}–{hms(end)} of the full video."
+        print(f"[gemini] {hms(start)}~ 받아쓰는 중…", file=sys.stderr)
+        try:
+            r = subprocess.run(cmd + ["--question", q], capture_output=True, text=True, timeout=1200)
+        except subprocess.TimeoutExpired:
+            return (None, "Gemini 시간 초과") if not segs else (None, f"Gemini 시간 초과 ({hms(start)} 구간)")
+        text, err = _gemini_answer(r.stdout)
+        chunk = parse_timestamped(text) if text else []
+        if not chunk:
+            if start > 0 and segs:  # 영상 끝을 지난 구간 → 정상 종료
+                break
+            return None, f"Gemini: {err or '타임스탬프 형식의 전사를 받지 못함'}"
+        # 구간 상대 시각으로 답했으면 절대 시각으로 보정
+        if start > 0 and chunk[0]["start"] < start - 60:
+            for s in chunk:
+                s["start"] += start
+        last = segs[-1]["start"] if segs else -1
+        segs += [s for s in chunk if s["start"] > last]
+        if duration and duration <= GEMINI_CHUNK:
+            break
+        # 길이를 모르면 빈 구간(또는 오류)이 나올 때까지 계속한다. 중간의 긴 침묵을 영상 끝으로
+        # 오판해 뒷부분을 잃는 것보다 호출 1회를 더 쓰는 편이 낫다.
+        start = end
+    coverage = None
+    if duration and segs:
+        coverage = round(min(segs[-1]["start"] / duration, 1.0), 2)
+    return {"segments": segs, "lang": "unknown", "kind": "gemini", "via": "watch/gemini",
+            "coverage": coverage}, None
 
 
 def write_txt(segs, path: Path, window: int = 20):
@@ -219,13 +298,15 @@ def main():
     ap.add_argument("--out", default="work")
     ap.add_argument("--lang", default=None, help="우선 자막 언어 (기본: 영상 원어 → ko → en)")
     ap.add_argument("--transcript-file", default=None, help="직접 확보한 자막 텍스트 파일")
+    ap.add_argument("--via", choices=("auto", "youtube", "gemini"), default="auto",
+                    help="auto: YouTube 자막 → 실패 시 Gemini / youtube: 자막만 / gemini: 바로 Gemini")
     a = ap.parse_args()
 
     vid = video_id(a.source)
     out = Path(a.out) / vid
     out.mkdir(parents=True, exist_ok=True)
 
-    info, meta_err = meta_ytdlp(vid)
+    info, meta_err = meta_ytdlp(vid) if a.via != "gemini" else (None, "yt-dlp 생략 (--via gemini)")
     meta = {"video_id": vid, "url": f"https://www.youtube.com/watch?v={vid}"}
     if info:
         meta.update({
@@ -243,21 +324,25 @@ def main():
             sys.exit(2)
         meta.update(o)
         meta.update({"duration": None, "chapters": [], "meta_via": "oembed", "meta_warning": meta_err})
-    meta["thumbnail"] = pick_thumbnail(vid)
 
     want = [x for x in dict.fromkeys([a.lang, (info or {}).get("language"), "ko", "en"]) if x]
     tr, errors = None, []
     if a.transcript_file:
         tr = subs_from_file(a.transcript_file)
     else:
-        if info:
-            tr, e = subs_ytdlp(info, want)
+        if a.via != "gemini":
+            if info:
+                tr, e = subs_ytdlp(info, want)
+                if e:
+                    errors.append(f"yt-dlp: {e}")
+            if not tr:
+                tr, e = subs_transcript_api(vid, want)
+                if e:
+                    errors.append(f"youtube-transcript-api: {e}")
+        if not tr and a.via != "youtube":
+            tr, e = subs_gemini(meta["url"], meta.get("duration"))
             if e:
-                errors.append(f"yt-dlp: {e}")
-        if not tr:
-            tr, e = subs_transcript_api(vid, want)
-            if e:
-                errors.append(f"youtube-transcript-api: {e}")
+                errors.append(f"gemini: {e}")
 
     if tr:
         segs = tr.pop("segments")
@@ -270,7 +355,7 @@ def main():
     (out / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
     print(json.dumps({k: meta.get(k) for k in
-                      ("video_id", "title", "channel", "duration", "thumbnail", "transcript", "meta_via")},
+                      ("video_id", "title", "channel", "duration", "transcript", "meta_via")},
                      ensure_ascii=False, indent=2))
     print(f"작업 폴더: {out}")
     if not tr:

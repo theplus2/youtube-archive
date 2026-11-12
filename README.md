@@ -13,7 +13,8 @@ https://youtu.be/... 전문 텍스트로 정리해줘                     ← Mo
 https://youtu.be/... 전문과 시각화 자료 둘 다                   ← 듀얼
 ```
 
-필요 조건: Google Drive 커넥터 연결, 환경의 네트워크 정책이 `youtube.com` · `img.youtube.com` · `pypi.org` 허용.
+필요 조건: Google Drive 커넥터 연결, 네트워크 정책이 `youtube.com` · `pypi.org` · `generativelanguage.googleapis.com` 허용.
+선택: `watch` 스킬 + 환경 설정에 `GEMINI_API_KEY` 등록(YouTube 차단 시 Gemini가 대신 받아쓰기).
 
 ## 구조
 
@@ -41,10 +42,10 @@ python3 scripts/build_doc.py work/VIDEO_ID
 
 ## 알려진 한계
 
-- **자막 추출은 클라우드 IP에서 불안정하다.** YouTube가 봇 차단(403/429, "Sign in to confirm")을 걸면
-  재시도 후에도 실패할 수 있다. 이때는 유튜브의 "스크립트 표시" 텍스트를 붙여넣어
-  `--transcript-file`로 넘긴다.
-- 자막 트랙이 없는 영상은 전사(Whisper 등)가 별도로 필요하다.
+- **자막 추출은 클라우드 IP에서 불안정하다.** YouTube가 봇 차단(403/429, "Sign in to confirm")을 건다.
+  이때 `watch` 스킬의 Gemini 엔진이 대신 받아쓴다(키 필요). 이것도 안 되면 유튜브의 "스크립트 표시"
+  텍스트를 붙여넣어 `--transcript-file`로 넘긴다.
+- **Gemini 받아쓰기는 원문 자막이 아니다.** 누락·오기·환각이 있을 수 있어 문서에 경고가 자동 표기된다.
+  긴 영상은 20분 단위로 나눠 받아쓰며, 구간 경계에서 문장이 끊기거나 겹칠 수 있다.
 - 자동 생성 자막은 고유명사·전문용어 오인식이 있다. 문서 상단에 전사 출처가 표기된다.
-- `hq1~3.jpg` 스틸컷은 유튜브 자동 생성 이미지로, 특정 타임스탬프의 프레임이 아니다.
 - HTML → Google Docs 변환은 Drive가 수행하며 일부 CSS는 유실될 수 있다.
