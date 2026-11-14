@@ -18,6 +18,13 @@ check는 다음을 검사하고, 하나라도 어기면 종료 코드 1로 끝�
     - 모든 청크에 교정본이 있는지
     - 교정본 글자 수가 원문의 MIN_RATIO~MAX_RATIO 범위인지 (요약·창작 방지)
     - 태그 형식과 시간 순서, 각 태그가 해당 청크 시간 범위 안인지
+    - 원문 보존율: 원문 글자가 교정본에 얼마나 남았는지(요약·생략 탐지)
+
+용어 교정표 clean/glossary.md:
+    "- 자막 원문 → 교정" 형식의 줄은 (괄호 속 메모는 빼고) 보존율 계산 전에 원문에 먼저 적용한다(원문 쪽은 " / "로 여러 개).
+    그래서 고유명사를 바로 고쳐도 '원문이 사라졌다'고 세지 않는다. 화살표 없는 줄은 메모로 보고 무시한다.
+    요약을 숨기는 데 쓰이지 않도록: 원문 쪽이 GLOSSARY_MAX자(공백 제외)를 넘거나, 교정 쪽이 원문 쪽의 절반보다 짧거나,
+    교정 쪽 글자가 그 청크 교정본에 없으면 무시한다. 용어표로 바꾸는 글자는 청크 원문의 GLOSSARY_SHARE까지만.
 """
 import difflib
 import json
@@ -32,6 +39,11 @@ MIN_RATIO, MAX_RATIO = 0.75, 1.30
 WARN_RATIO = 0.97
 MIN_COVERAGE = 0.88         # 원문 글자(한글·숫자·영문) 중 교정본에 그대로 남아야 하는 비율
 MAX_GAP = 20                # 교정본에 대응하는 곳이 없는 원문 연속 구간 최대 길이(글자)
+GLOSSARY_MAX = 20           # 용어 교정표 한 항목의 원문 쪽 최대 글자 수(공백·부호 제외)
+GLOSSARY_SHARE = 0.12       # 용어표로 바꿀 수 있는 원문 글자의 청크당 최대 비율
+PAREN = re.compile(r"\([^)]*\)")           # 용어표의 괄호 속 메모·(?)는 비교에서 뺀다
+GLOSSARY_ITEM = re.compile(r"^\s*[-*]\s+(.+?)\s*$")
+ARROW = re.compile(r"\s*(?:→|->)\s*")
 TAG = re.compile(r"^\[(\d{1,2}):([0-5]\d):([0-5]\d)\]\s*")
 CORE = re.compile(r"[^가-힣0-9A-Za-z]")
 SENTENCE_END = (".", "?", "!", "…", '"', "”", "'", "’", "]", ")", "」", "』")
@@ -54,10 +66,90 @@ def size(text: str) -> int:
     return len(NOISE.sub("", text))
 
 
-def coverage(raw: str, corr: str):
-    """원문 글자가 교정본에 얼마나 남았는지와, 대응이 없는 가장 긴 원문 구간을 돌려준다."""
+def glossary(work: Path):
+    """clean/glossary.md 의 교정 쌍을 {원문 핵심 글자: 교정 핵심 글자}로 돌려준다.
+
+    한 줄에 화살표가 하나면:  - 빌리지 / 빌리진 → 빌리 진      (원문 여러 표기 → 교정 하나)
+                              - 홈 쉰다 / 홈지기 → 훔친다 / 훔치기   (양쪽 개수가 다르면 가장 닮은 교정에 짝지음)
+    화살표가 여럿이면 " / "로 나뉜 쌍들:  - 무릎에 → 물음에 / 태연이 → 태연히
+    "·"는 양쪽 개수가 같으면 나란히 대응:  - 구조학·구조을 → 구조악은·구조악을
+    괄호 속 메모는 먼저 지운다. 남용 방지 규칙은 coverage()에 있다.
+    """
+    gp = work / "clean" / "glossary.md"
+    if not gp.exists():
+        return {}
+    pairs = {}
+
+    def add(src, dst):
+        src, dst = CORE.sub("", src), CORE.sub("", dst)
+        if src and dst and src != dst and len(src) <= GLOSSARY_MAX and src not in pairs:
+            pairs[src] = dst
+
+    def add_many(srcs, dsts):
+        srcs, dsts = [x for x in srcs if x.strip()], [x for x in dsts if x.strip()]
+        if not srcs or not dsts:
+            return
+        if len(srcs) == len(dsts):
+            for a, b in zip(srcs, dsts):
+                add(a, b)
+            return
+        for a in srcs:      # 개수가 다르면 글자가 가장 닮은 교정과 짝짓는다
+            add(a, max(dsts, key=lambda d: difflib.SequenceMatcher(None, a, d).ratio()))
+
+    for line in gp.read_text(encoding="utf-8-sig").splitlines():
+        m = GLOSSARY_ITEM.match(PAREN.sub("", line))
+        if not m or not ARROW.search(m[1]):
+            continue
+        body = m[1]
+        if len(ARROW.findall(body)) == 1:
+            src, dst = ARROW.split(body, maxsplit=1)
+            srcs = [x for part in src.split(" / ") for x in part.split("·")]
+            dsts = [x for part in dst.split(" / ") for x in part.split("·")]
+            add_many(srcs, dsts)
+            continue
+        pending = []
+        for seg in body.split(" / "):
+            if not ARROW.search(seg):
+                pending.append(seg)       # 화살표 없는 조각은 다음 쌍의 또 다른 원문
+                continue
+            src, dst = ARROW.split(seg, maxsplit=1)
+            srcs, dsts = src.split("·"), dst.split("·")
+            if len(srcs) == len(dsts) > 1:
+                add_many(srcs, dsts)
+            else:
+                add_many(srcs + pending, [dst])
+            pending = []
+    return pairs
+
+
+def apply_glossary(a: str, b: str, gloss: dict):
+    """원문 핵심 글자 a에 용어표를 한 번에(연쇄 없이) 적용한다. 남용 방지:
+    - 교정 쪽이 교정본 b에 실제로 있어야 한다
+    - 교정 쪽 길이가 원문 쪽의 절반 이상이어야 한다(긴 원문을 짧은 말로 덮어 문장을 숨기지 못하게)
+    - 용어표로 바뀐 원문 글자가 청크의 GLOSSARY_SHARE 를 넘으면 넘는 만큼은 적용하지 않는다
+    """
+    usable = {s: d for s, d in gloss.items() if d in b and len(d) * 2 >= len(s)}
+    if not usable:
+        return a
+    pat = re.compile("|".join(re.escape(s) for s in sorted(usable, key=len, reverse=True)))
+    budget = int(len(a) * GLOSSARY_SHARE)
+
+    def sub(m):
+        nonlocal budget
+        if len(m[0]) > budget:
+            return m[0]
+        budget -= len(m[0])
+        return usable[m[0]]
+    return pat.sub(sub, a)
+
+
+def coverage(raw: str, corr: str, gloss=None):
+    """원문 글자가 교정본에 얼마나 남았는지와, 대응이 없는 가장 긴 원문 구간을 돌려준다.
+    gloss: glossary() 결과. 원문에 먼저 적용해 정당한 용어 교정을 손실로 세지 않는다."""
     a = CORE.sub("", TAG_ANY.sub("", raw))
     b = CORE.sub("", TAG_ANY.sub("", corr))
+    if gloss:
+        a = apply_glossary(a, b, gloss)
     if not a:
         return 1.0, ""
     sm = difflib.SequenceMatcher(None, a, b, autojunk=False)
@@ -139,6 +231,7 @@ def load(work: Path, strict: bool = True):
     if not manifest:
         die("manifest.json 에 청크가 없습니다(자막이 비어 있음).")
     paras, warns, errs = [], [], []
+    gloss = glossary(work)
     last = -1.0
     carry = False
     for m in manifest:
@@ -150,13 +243,14 @@ def load(work: Path, strict: bool = True):
         text = f.read_text(encoding="utf-8-sig").replace("\r\n", "\n").strip()
         raw = (d / f"{m['id']}.raw.txt").read_text(encoding="utf-8-sig")
         ratio = size(text) / max(m["raw_chars"], 1)
-        cov, gap = coverage(raw, text)
+        cov, gap = coverage(raw, text, gloss)
         if not MIN_RATIO <= ratio <= MAX_RATIO:
             errs.append(f"{f.name}: 글자 수 비율 {ratio:.2f} (허용 {MIN_RATIO}~{MAX_RATIO}). 요약·생략 또는 창작 의심")
         elif ratio < WARN_RATIO:
             warns.append(f"{f.name}: 글자 수 비율 {ratio:.2f} — 빠진 내용이 없는지 다시 볼 것")
         if cov < MIN_COVERAGE:
-            errs.append(f"{f.name}: 원문 보존율 {cov:.2f} (최소 {MIN_COVERAGE}). 원문이 많이 바뀌거나 빠졌다")
+            errs.append(f"{f.name}: 원문 보존율 {cov:.2f} (최소 {MIN_COVERAGE}). 원문이 많이 바뀌거나 빠졌다"
+                        + ("" if gloss else " — 고유명사 교정은 clean/glossary.md 에 '- 원문 → 교정' 으로 적으면 반영된다"))
         if len(gap) >= MAX_GAP:
             errs.append(f"{f.name}: 교정본에 없는 원문 구간 {len(gap)}자 — '{gap[:40]}…' (빠진 문장인지 확인)")
         blocks = [" ".join(x.strip() for x in b.splitlines() if x.strip()) for b in re.split(r"\n\s*\n", text)]

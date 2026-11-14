@@ -17,6 +17,7 @@ content.json 스키마:
   "mode": "B",                        # "A" 전문 | "B" 시각화 요약 | "dual" 둘 다
   "summary": {                        # mode B / dual
     "thesis": ["문단", ...],          # 핵심 명제 (합쳐서 5~7줄) — 요약에서 유일한 본문 텍스트
+    "style": "note",                  # 선택. "note" 손글씨 노트(기본) | "clean" 깔끔한 도식
     "visuals": [                      # 시각화 요약: 다이어그램 4~7개. 형식은 render_visuals.py 상단 주석 참조
       {"type": "tree", "title": "제목", "start": 132, "caption": "한 줄 설명(선택)", ...}
     ]
@@ -43,7 +44,7 @@ import clean_transcript  # noqa: E402
 import render_visuals  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "5.4.0"
+VERSION = "5.5.0"
 
 # ---------- 디자인 토큰 (Google Docs HTML 가져오기에서 살아남는 속성만 사용) ----------
 INK, MUTED, FAINT = "#202124", "#5f6368", "#9aa0a6"
@@ -241,11 +242,15 @@ def main():
             die("mode B/dual에는 summary.visuals(다이어그램)가 필요합니다"
                 + (f" — 예전 텍스트 요약 필드({', '.join(legacy)})는 더 이상 쓰지 않음" if legacy else ""))
         try:
-            shots = render_visuals.render_all(visuals, work / "visuals")
+            shots = render_visuals.render_all(visuals, work / "visuals",
+                                              s.get("style", render_visuals.DEFAULT_STYLE))
         except (ValueError, RuntimeError) as err:
             die(f"시각화 렌더링 실패: {err}")
+        for png, _, _, warns in shots:
+            for m in warns:
+                print(f"[주의] 그림 {png.name}: {m}", file=sys.stderr)
         h2b("시각화 요약")
-        for v, (png, w, hgt) in zip(visuals, shots):
+        for v, (png, w, hgt, _) in zip(visuals, shots):
             head = e(v["title"])
             if v.get("start") is not None and has_ts:
                 head += "  " + link(v["start"], f"▶ {short(v['start'], long_video)}", size="10pt")

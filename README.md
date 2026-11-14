@@ -8,7 +8,7 @@ Google Drive `YouTube지식 통합아카이빙` 폴더에 저장하는 Claude Co
 이 저장소를 연 Claude Code 세션에서 유튜브 URL과 함께 요청한다.
 
 ```
-https://www.youtube.com/watch?v=... 요약해서 아카이빙해줘        ← Mode B (기본, 핵심 명제 + 다이어그램)
+https://www.youtube.com/watch?v=... 요약해서 아카이빙해줘        ← Mode B (기본, 핵심 명제 + 손글씨 노트 스타일 다이어그램)
 https://youtu.be/... 전문 텍스트로 정리해줘                     ← Mode A
 https://youtu.be/... 전문과 시각화 자료 둘 다                   ← 듀얼
 https://www.youtube.com/playlist?list=... 재생목록 전체 아카이빙해줘 ← 영상마다 문서 1개
@@ -57,7 +57,7 @@ pip install -r requirements.txt
 | `scripts/yt_fetch.py` | 메타데이터·자막 추출 → `work/<ID>/` |
 | `scripts/clean_transcript.py` | 전문 교정: 자막 청크 분할(`prep`) · 교정본 누락 검사(`check`) |
 | `scripts/build_doc.py` | `content.json` → 서식이 고정된 `doc.html` |
-| `scripts/render_visuals.py` | 요약 다이어그램 명세 → PNG (헤드리스 Chrome/Edge) |
+| `scripts/render_visuals.py` | 요약 다이어그램 명세 → PNG (헤드리스 Chrome/Edge). 손글씨 노트/깔끔한 도식 스타일, 레이아웃 자동 점검 |
 | `config/categories.json` | 14대 카테고리, Drive 폴더 ID 캐시 |
 | `work/` | 작업 산출물 (git 제외) |
 
@@ -89,3 +89,5 @@ python3 scripts/yt_fetch.py --list "https://www.youtube.com/playlist?list=LIST_I
 - 자동 생성 자막은 고유명사·전문용어 오인식이 있다. 전문은 Claude가 문맥으로 교정하지만 완벽하지 않으므로,
   확신 없는 곳은 `(?)`·`[불명확]`으로 남기고 문단마다 원본 영상 시각 링크를 단다.
 - HTML → Google Docs 변환은 Drive가 수행하며 일부 CSS는 유실될 수 있다.
+- 손글씨 노트 스타일(기본)은 Google Fonts에서 Poor Story 글꼴을 불러오므로 그림을 그릴 때 인터넷이 필요하다.
+  글꼴을 못 불러오면 그림을 만들지 않고 멈춘다(`content.json`의 `summary.style`을 `"clean"`으로 바꾸면 글꼴 없이 그린다).
