@@ -8,11 +8,12 @@ Google Drive `YouTube지식 통합아카이빙` 폴더에 저장하는 Claude Co
 이 저장소를 연 Claude Code 세션에서 유튜브 URL과 함께 요청한다.
 
 ```
-https://www.youtube.com/watch?v=... 요약해서 아카이빙해줘        ← Mode B (기본, 핵심 명제 + 손글씨 노트 스타일 다이어그램)
-https://youtu.be/... 전문 텍스트로 정리해줘                     ← Mode A
-https://youtu.be/... 전문과 시각화 자료 둘 다                   ← 듀얼
+https://www.youtube.com/watch?v=... 아카이빙해줘
 https://www.youtube.com/playlist?list=... 재생목록 전체 아카이빙해줘 ← 영상마다 문서 1개
 ```
+
+모든 문서는 **요약 + 전문** 한 가지 형식이다: 설교 활용 태그 → 핵심 명제와 손글씨 노트 스타일 다이어그램 → 교정 전문
+(문단마다 영상 시각 링크). 요약만·전문만 문서는 만들지 않는다.
 
 모든 문서 머리에는 **설교 활용 태그** 표(`본문: 히브리서 11:1 (히 11:1)`, `주제: 고난`, `삶: 불안` 같은 고정 표기)와 예화 카드가 들어간다.
 Drive 검색창에 `"주제: 고난"`처럼 따옴표로 넣으면 설교 준비 때 관련 아카이브를 찾을 수 있다.
@@ -45,7 +46,7 @@ pip install -r requirements.txt
 
 4. 이 폴더에서 Claude Code를 열고, Google Drive 커넥터가 연결되어 있는지 확인한다
    (claude.ai 계정으로 로그인하면 claude.ai에 연결한 커넥터를 쓸 수 있다).
-5. 유튜브 URL과 함께 "요약해서 아카이빙해줘"라고 요청한다.
+5. 유튜브 URL과 함께 "아카이빙해줘"라고 요청한다.
 
 - Windows에서는 명령의 `python3`를 `py`로 바꿔 실행한다(`pip install`은 `py -m pip install`).
   `python`은 Microsoft Store 바로가기라 실행되지 않을 수 있다.

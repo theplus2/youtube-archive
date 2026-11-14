@@ -7,25 +7,26 @@
 서식(글꼴·색·여백·딥링크·파일명 규칙)은 전부 이 스크립트가 고정한다.
 Claude는 content.json에 '내용'만 쓴다.
 
-전문(Mode A) 본문:
+모든 문서는 요약 + 전문이다(v5.7.0~): 시각화 요약(핵심 명제 + 다이어그램) 뒤에 교정 전문이 이어진다.
+
+전문 본문:
   - 기본: work/<ID>/clean/ 의 Claude 교정본(clean_transcript.py 참고)을 쓴다. 누락·축약 검사를 통과해야 한다.
   - content.json에 "cleanup": false 이면 자막 원문을 그대로 쓴다(화자 전환 >> 기준으로 문단 분리).
 
 content.json 스키마:
 {
   "category": "신학&교회",            # config/categories.json의 name (번호·대괄호 없이)
-  "mode": "B",                        # "A" 전문 | "B" 시각화 요약 | "dual" 둘 다
-  "summary": {                        # mode B / dual
+  "summary": {                        # 필수
     "thesis": ["문단", ...],          # 핵심 명제 (합쳐서 5~7줄) — 요약에서 유일한 본문 텍스트
     "style": "note",                  # 선택. "note" 손글씨 노트(기본) | "clean" 깔끔한 도식
     "visuals": [                      # 시각화 요약: 다이어그램 4~7개. 형식은 render_visuals.py 상단 주석 참조
       {"type": "tree", "title": "제목", "start": 132, "caption": "한 줄 설명(선택)", ...}
     ]
   },
-  "sections": [                       # mode A / dual. 생략하면 챕터 → 5분 단위로 자동 분할
+  "sections": [                       # 전문 소제목. 생략하면 챕터 → 5분 단위로 자동 분할
     {"start": 0, "anchor": "그 문단의 첫 말(선택)", "title": "소제목"}
   ],
-  "cleanup": true,                    # mode A / dual. false면 교정 없이 원문
+  "cleanup": true,                    # false면 교정 없이 원문
   "corrections": [["자막 원문", "교정"], ...],   # 선택. 문서 끝 '주요 교정 어휘' 표
   "notes": ["문서 상단 '읽기 전에' 상자에 넣을 문구(선택)"],
   "sermon": {"level": "상", ...},     # 필수. 설교 활용 태그 — 형식은 sermon_tags.py 상단 주석 참조
@@ -47,7 +48,7 @@ import render_visuals  # noqa: E402
 import sermon_tags  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "5.6.0"
+VERSION = "5.7.0"
 
 # ---------- 디자인 토큰 (Google Docs HTML 가져오기에서 살아남는 속성만 사용) ----------
 INK, MUTED, FAINT = "#202124", "#5f6368", "#9aa0a6"
@@ -153,9 +154,10 @@ def main():
     if not cat:
         die(f"category '{content.get('category')}' 는 14대 카테고리에 없습니다 (번호·대괄호 없이 name만 쓸 것): "
             + ", ".join(c["name"] for c in cats["categories"]))
-    mode = content.get("mode", "B")
-    if mode not in ("A", "B", "dual"):
-        die("mode는 A, B, dual 중 하나")
+    # v5.7.0부터 모든 문서는 요약 + 전문(dual)이다. 요약만·전문만 문서는 만들지 않는다.
+    if content.get("mode") not in (None, "dual"):
+        print(f"[주의] content.json의 mode '{content['mode']}'는 무시합니다 — 항상 요약 + 전문으로 만듭니다", file=sys.stderr)
+    mode = "dual"
 
     vid = meta["video_id"]
     watch = f"https://www.youtube.com/watch?v={vid}"
@@ -173,7 +175,7 @@ def main():
     if mode in ("A", "dual"):
         tp = work / "transcript.json"
         if not tp.exists():
-            die("전문(Mode A)에는 transcript.json이 필요합니다. 자막 없이 전문을 만들 수 없습니다.")
+            die("전문에는 transcript.json이 필요합니다. 자막 없이 전문을 만들 수 없습니다.")
         segs = json.loads(tp.read_text(encoding="utf-8"))
         if content.get("cleanup", True):
             paras, clean_warns = clean_transcript.load(work)
@@ -259,7 +261,7 @@ def main():
     if mode in ("B", "dual"):
         s = content.get("summary") or {}
         if not s.get("thesis"):
-            die("mode B/dual에는 summary.thesis가 필요합니다")
+            die("summary.thesis(핵심 명제)가 필요합니다")
         def h2b(text):
             nonlocal n_h2
             n_h2 += 1
@@ -271,7 +273,7 @@ def main():
         visuals = s.get("visuals") or []
         if not visuals:
             legacy = [k for k in ("logic_tree", "table", "points") if s.get(k)]
-            die("mode B/dual에는 summary.visuals(다이어그램)가 필요합니다"
+            die("summary.visuals(다이어그램)가 필요합니다"
                 + (f" — 예전 텍스트 요약 필드({', '.join(legacy)})는 더 이상 쓰지 않음" if legacy else ""))
         try:
             shots = render_visuals.render_all(visuals, work / "visuals",
