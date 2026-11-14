@@ -3,7 +3,7 @@
     "title": "YouTube지식 통합아카이빙",
     "id": "1zj4ugfPbI0PKIdy56zTa6Gv8DzabxvuN"
   },
-  "_note": "14개 카테고리 폴더 모두 드라이브 루트 아래에 생성됨(2026-11-12). 폴더를 새로 만들거나 옮기면 folder_id를 갱신한다.",
+  "_note": "15개 카테고리 폴더 모두 드라이브 루트 아래에 있음(1~14: 2026-11-12, 15: 2026-11-14 추가). 폴더를 새로 만들거나 옮기면 folder_id를 갱신한다. 14.기타통합은 번호와 상관없이 마지막에 고르는 나머지 분류다.",
   "categories": [
     {"no": 1,  "name": "신학&교회",          "folder": "1.[신학&교회]",          "folder_id": "1Yw-ejFLOPVdOw3a4rgNq6_K3KQhPcej1", "scope": "교리, 교회사, 성경연구, 현대교회, 구약, 신약, 설교, 기독교 사상"},
     {"no": 2,  "name": "역사&인문학",        "folder": "2.[역사&인문학]",        "folder_id": "1b_QsYLWp0GXbna8rrdMYRnAord1qbZoZ", "scope": "세계사, 한국사, 고고학, 지리, 인류학, 철학, 문학, 인문학"},
@@ -18,6 +18,7 @@
     {"no": 11, "name": "운동&건강",          "folder": "11.[운동&건강]",         "folder_id": "1dJuQrvhmQVuU_C7navXLSZeMrQgOk9mZ", "scope": "신체 운동, 웨이트 트레이닝, 재활, 건강관리, 영양, 피트니스"},
     {"no": 12, "name": "음식&맛집",          "folder": "12.[음식&맛집]",         "folder_id": "1sKx5yuan8hD8kOcmG1j7Ae60FtJC1-wF", "scope": "맛집 탐방, 노포, 요리 레시피, 전통음식, 미슐랭"},
     {"no": 13, "name": "여행&숙소",          "folder": "13.[여행&숙소]",         "folder_id": "1LY4Q8m-fS_OWKxjY_M-3A9k_O_V_S4eZ", "scope": "국내/해외 여행지, 호텔, 리조트, 펜션, 관광 코스, 교통편"},
-    {"no": 14, "name": "기타통합",           "folder": "14.[기타통합]",          "folder_id": "13eZTX22ShpNvutqjy0iS54_nysbBOq5v", "scope": "위 13개 카테고리에 속하지 않는 복합 또는 기타 지식 콘텐츠"}
+    {"no": 14, "name": "기타통합",           "folder": "14.[기타통합]",          "folder_id": "13eZTX22ShpNvutqjy0iS54_nysbBOq5v", "scope": "다른 14개 카테고리 어디에도 속하지 않는 복합 또는 기타 지식 콘텐츠"},
+    {"no": 15, "name": "영화&드라마",        "folder": "15.[영화&드라마]",       "folder_id": "1ibToHgCq23jPu70Xq4EbU_NXykb1lTwD", "scope": "영화·드라마·OTT 시리즈·애니메이션 작품의 리뷰와 해석, 줄거리·결말 해설, 연출·각본·연기·촬영 분석, 감독·배우·제작 비하인드, 영화사·장르사, 원작과 각색, 영화제·시상식"}
   ]
 }

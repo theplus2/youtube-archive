@@ -1,6 +1,6 @@
 # youtube-archive
 
-유튜브 영상의 자막을 추출해 14대 카테고리로 분류하고, 서식이 적용된 구글 문서로
+유튜브 영상의 자막을 추출해 15대 카테고리로 분류하고, 서식이 적용된 구글 문서로
 Google Drive `YouTube지식 통합아카이빙` 폴더에 저장하는 Claude Code 스킬 저장소.
 
 ## 사용법
@@ -63,7 +63,7 @@ pip install -r requirements.txt
 | `scripts/build_doc.py` | `content.json` → 서식이 고정된 `doc.html` |
 | `scripts/sermon_tags.py` | 설교 활용 태그(설교연결도·관련본문·원어·주제·삶·예화 카드) 검사와 고정 표기 — Drive 전문 검색용 |
 | `scripts/render_visuals.py` | 요약 다이어그램 명세 → PNG (헤드리스 Chrome/Edge). 손글씨 노트/깔끔한 도식 스타일, 레이아웃 자동 점검 |
-| `config/categories.json` | 14대 카테고리, Drive 폴더 ID 캐시 |
+| `config/categories.json` | 15대 카테고리(범위·Drive 폴더 ID). 14.기타통합은 마지막에 고르는 나머지 분류 |
 | `work/` | 작업 산출물 (git 제외) |
 
 ## 수동 실행

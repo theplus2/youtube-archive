@@ -48,7 +48,7 @@ import render_visuals  # noqa: E402
 import sermon_tags  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "5.7.0"
+VERSION = "5.8.0"
 
 # ---------- 디자인 토큰 (Google Docs HTML 가져오기에서 살아남는 속성만 사용) ----------
 INK, MUTED, FAINT = "#202124", "#5f6368", "#9aa0a6"
@@ -152,7 +152,7 @@ def main():
 
     cat = next((c for c in cats["categories"] if c["name"] == content.get("category")), None)
     if not cat:
-        die(f"category '{content.get('category')}' 는 14대 카테고리에 없습니다 (번호·대괄호 없이 name만 쓸 것): "
+        die(f"category '{content.get('category')}' 는 config/categories.json 카테고리에 없습니다 (번호·대괄호 없이 name만 쓸 것): "
             + ", ".join(c["name"] for c in cats["categories"]))
     # v5.7.0부터 모든 문서는 요약 + 전문(dual)이다. 요약만·전문만 문서는 만들지 않는다.
     if content.get("mode") not in (None, "dual"):
