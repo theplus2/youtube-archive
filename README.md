@@ -3,6 +3,9 @@
 유튜브 영상의 자막을 추출해 15대 카테고리로 분류하고, 서식이 적용된 구글 문서로
 Google Drive `YouTube지식 통합아카이빙` 폴더에 저장하는 Claude Code 스킬 저장소.
 
+> **처음 쓰는 분은 [SETUP_GUIDE.md](SETUP_GUIDE.md)부터 보세요.** 프로그램 설치부터 첫 아카이빙, 업데이트, 문제 해결까지
+> 순서대로 따라 하기만 하면 되도록 정리해 두었습니다.
+
 ## 사용법
 
 이 저장소를 연 Claude Code 세션에서 유튜브 URL과 함께 요청한다.
@@ -58,7 +61,7 @@ pip install -r requirements.txt
 ## 동료와 공유하기
 
 1. 동료에게 이 저장소 주소를 알려 준다(비공개 저장소면 GitHub에서 Collaborator로 초대).
-2. 동료는 위 '로컬 PC에서 실행' 1~5를 따른다. 자기 claude.ai 계정에 Google Drive 커넥터를 연결해야 한다.
+2. 동료는 [SETUP_GUIDE.md](SETUP_GUIDE.md)를 처음부터 따라 한다(설치·커넥터 연결·첫 아카이빙·문제 해결).
 3. 첫 아카이빙 때 동료의 Drive에 아카이브 폴더가 자동으로 생긴다. 서로의 Drive 폴더는 섞이지 않는다.
 
 스킬·스크립트를 고친 내용은 git으로 주고받는다(`git pull`). 각자의 `config/drive.local.json`과 `work/`는 공유되지 않는다.
