@@ -44,10 +44,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import clean_transcript  # noqa: E402
+import drive_ids  # noqa: E402
 import render_visuals  # noqa: E402
 import sermon_tags  # noqa: E402
 
-ROOT = Path(__file__).resolve().parent.parent
 VERSION = "5.8.0"
 
 # ---------- 디자인 토큰 (Google Docs HTML 가져오기에서 살아남는 속성만 사용) ----------
@@ -148,7 +148,8 @@ def main():
             die(f"{work / f} 가 없습니다")
     meta = json.loads((work / "meta.json").read_text(encoding="utf-8"))
     content = json.loads((work / "content.json").read_text(encoding="utf-8"))
-    cats = json.loads((ROOT / "config" / "categories.json").read_text(encoding="utf-8"))
+    cats = drive_ids.categories()
+    drive = drive_ids.load()          # 사람마다 다른 Drive 폴더 ID (config/drive.local.json, git 제외)
 
     cat = next((c for c in cats["categories"] if c["name"] == content.get("category")), None)
     if not cat:
@@ -394,8 +395,9 @@ def main():
     print(json.dumps({
         "title": title,
         "folder": cat["folder"],
-        "folder_id": cat["folder_id"],
-        "root_id": cats["root"]["id"],
+        "folder_id": drive["folders"].get(cat["name"]),   # 없으면 null → SKILL.md 4단계대로 찾거나 만든다
+        "root_id": drive["root_id"],
+        "root_title": cats["root"]["title"],
         "html_path": str(out.resolve()),
         "html_bytes": len(data),
         "file_reference": f"sha256:{digest}:{out.resolve()}",

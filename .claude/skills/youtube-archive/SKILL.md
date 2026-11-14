@@ -1,6 +1,6 @@
 ---
 name: youtube-archive
-description: "[v5.8.0] 유튜브 영상(또는 재생목록의 각 영상)의 자막을 추출해 15대 카테고리(영화&드라마 포함)로 분류하고, 서식이 적용된 구글 문서로 드라이브 'YouTube지식 통합아카이빙' 폴더에 저장한다. 사용자가 유튜브 영상·재생목록 URL을 주며 정리·요약·전문·아카이빙·분석을 요청할 때 사용한다. 모든 문서는 다이어그램 중심 시각화 요약 + 교정 전문을 함께 담는다."
+description: "[v5.9.0] 유튜브 영상(또는 재생목록의 각 영상)의 자막을 추출해 15대 카테고리(영화&드라마 포함)로 분류하고, 서식이 적용된 구글 문서로 드라이브 'YouTube지식 통합아카이빙' 폴더에 저장한다. 사용자가 유튜브 영상·재생목록 URL을 주며 정리·요약·전문·아카이빙·분석을 요청할 때 사용한다. 모든 문서는 다이어그램 중심 시각화 요약 + 교정 전문을 함께 담는다."
 ---
 
 # 유튜브 텍스트 추출·분석 아카이빙 (Claude Code + GitHub 저장소판)
@@ -36,8 +36,11 @@ description: "[v5.8.0] 유튜브 영상(또는 재생목록의 각 영상)의 �
   남의 영상을 다시 올린 경우 머리 정보표에 `원본 출처`(선택 `source`)를 남긴다.
 - **v5.7.0**: 모드 선택을 없앴다. **모든 문서는 요약 + 전문**(시각화 요약 뒤에 교정 전문)으로 만든다.
   `content.json`의 `mode`는 쓰지 않으며, 적혀 있어도 무시한다.
-- **v5.8.0 (Current)**: 15번째 카테고리 **`15.[영화&드라마]`** 신설(Drive 폴더 생성, `categories.json`에 ID 기록).
+- **v5.8.0**: 15번째 카테고리 **`15.[영화&드라마]`** 신설(Drive 폴더 생성, `categories.json`에 ID 기록).
   3단계에 비슷한 카테고리와의 경계표와 영화·드라마 영상 작성 요령을 넣었다.
+- **v5.9.0 (Current)**: 동료와 저장소를 공유할 수 있게 **Drive 폴더 ID를 사람별 설정으로 분리**했다.
+  ID는 git에 올리지 않는 `config/drive.local.json`(`scripts/drive_ids.py`)에 두고, 처음 쓰는 사람은 첫 아카이빙 때
+  자기 Drive에 루트·카테고리 폴더를 찾거나 만든다(4단계). `categories.json`에는 이름·폴더명·범위만 남겼다.
 
 ## 절대 규칙
 
@@ -100,7 +103,7 @@ python3 scripts/yt_fetch.py --list "<재생목록 URL>"
    - 자막 확보 실패(종료 코드 3)나 그 밖의 오류는 그 영상만 '실패'로 적고 다음 영상으로 넘어간다. 추측으로 문서를 만들지 않는 규칙은 같다.
    - 처음 2~3개가 연달아 봇 차단으로 실패하면 멈추고 사용자에게 알린다(나머지도 같은 이유로 실패할 가능성이 높다).
    - 여러 영상을 할 때는 영상 하나를 서브에이전트 하나에 맡길 수 있다. 같은 시점에 Drive 폴더를 새로 만드는
-     충돌을 피하려고 폴더 ID 확보·`categories.json` 기록·커밋은 메인 세션이 한다.
+     충돌을 피하려고 폴더 ID 확보와 `drive_ids.py` 기록은 메인 세션이 한다.
 5. **보고**는 표 하나로: 순번 · 제목 · 결과(완료/이미 있음/실패/비공개) · 카테고리 · 문서 링크. 실패한 영상은 이유를 한 줄로 적는다.
 
 ### 2단계: 추출
@@ -286,13 +289,23 @@ python3 scripts/clean_transcript.py check work/<VIDEO_ID>
 python3 scripts/build_doc.py work/<VIDEO_ID>
 ```
 
-출력 JSON의 `title`, `folder`, `folder_id`, `root_id`, `file_reference`를 사용한다.
+출력 JSON의 `title`, `folder`, `folder_id`, `root_id`, `root_title`, `file_reference`를 사용한다.
 
-1. **폴더 ID 확보**
-   - `folder_id`가 있으면 그대로 쓴다.
-   - `null`이면 `search_files(query="parentId = '<root_id>' and title contains '<카테고리명>'")`로 찾는다.
-   - 그래도 없으면 `create_file(title="<folder>", contentMimeType="application/vnd.google-apps.folder", parentId="<root_id>")`로 만든다.
-   - 찾거나 만든 ID는 `config/categories.json`에 기록하고 커밋한다.
+Drive 폴더 ID는 **사람마다 다르다**. 실행하는 사람의 Drive 기준 ID를 git에 올리지 않는 `config/drive.local.json`에 두고
+`scripts/drive_ids.py`로 읽고 쓴다. `config/categories.json`(공유)에는 ID를 쓰지 않는다. 저장소를 처음 받은 사람은
+이 파일이 없으므로 `root_id`·`folder_id`가 `null`로 나오고, 아래 순서대로 자기 Drive에 폴더를 찾거나 만든다.
+
+1. **루트 폴더 ID 확보** (`root_id`가 `null`일 때만)
+   - `search_files(query="title = '<root_title>' and mimeType = 'application/vnd.google-apps.folder' and owner = 'me' and trashed = false")`
+   - 하나면 그 ID. 여럿이면 AskUserQuestion으로 어느 것인지 묻는다(남이 공유한 폴더가 아니라 본인 폴더인지 확인).
+   - 없으면 `create_file(title="<root_title>", contentMimeType="application/vnd.google-apps.folder")`로 내 드라이브 맨 위에 만든다.
+   - `python3 scripts/drive_ids.py set-root <ID>`로 기록한다.
+2. **카테고리 폴더 ID 확보** (`folder_id`가 `null`일 때만)
+   - `search_files(query="parentId = '<root_id>' and title = '<folder>' and trashed = false")`로 찾는다.
+     `title contains '영상&음향'`은 `AI 영상&음향 제작`까지 걸리므로 `=`로 정확히 찾는다.
+   - 없으면 `create_file(title="<folder>", contentMimeType="application/vnd.google-apps.folder", parentId="<root_id>")`로 만든다.
+   - `python3 scripts/drive_ids.py set "<카테고리명>" <ID>`로 기록한다. 개인 설정이라 **커밋하지 않는다**.
+   - 처음 쓰는 사람의 첫 보고에는 루트·카테고리 폴더를 새로 만들었는지 알린다. `drive_ids.py show`로 현재 상태를 볼 수 있다.
 2. **문서 생성** — Google Drive 커넥터 `create_file`:
    - `title`: 출력의 `title` 그대로
    - `contentMimeType`: `text/html` (Drive가 Google Docs로 자동 변환)

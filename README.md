@@ -47,11 +47,21 @@ pip install -r requirements.txt
 4. 이 폴더에서 Claude Code를 열고, Google Drive 커넥터가 연결되어 있는지 확인한다
    (claude.ai 계정으로 로그인하면 claude.ai에 연결한 커넥터를 쓸 수 있다).
 5. 유튜브 URL과 함께 "아카이빙해줘"라고 요청한다.
+   처음 한 번은 Claude가 **내 Google Drive**에 `YouTube지식 통합아카이빙` 폴더(이미 있으면 그것)와 카테고리 폴더를 찾거나 만들고,
+   그 ID를 `config/drive.local.json`에 적어 둔다. 이 파일은 사람마다 다르므로 git에 올라가지 않는다.
 
 - Windows에서는 명령의 `python3`를 `py`로 바꿔 실행한다(`pip install`은 `py -m pip install`).
   `python`은 Microsoft Store 바로가기라 실행되지 않을 수 있다.
 - 자막 트랙이 없는 영상만 Whisper 계열 전사가 필요하다(`watch` 스킬의 WhisperX 등).
 - Gemini 경로는 선택 사항이다. 쓰려면 `GEMINI_API_KEY` 또는 `GOOGLE_API_KEY` 환경 변수를 설정한다.
+
+## 동료와 공유하기
+
+1. 동료에게 이 저장소 주소를 알려 준다(비공개 저장소면 GitHub에서 Collaborator로 초대).
+2. 동료는 위 '로컬 PC에서 실행' 1~5를 따른다. 자기 claude.ai 계정에 Google Drive 커넥터를 연결해야 한다.
+3. 첫 아카이빙 때 동료의 Drive에 아카이브 폴더가 자동으로 생긴다. 서로의 Drive 폴더는 섞이지 않는다.
+
+스킬·스크립트를 고친 내용은 git으로 주고받는다(`git pull`). 각자의 `config/drive.local.json`과 `work/`는 공유되지 않는다.
 
 ## 구조
 
@@ -63,7 +73,9 @@ pip install -r requirements.txt
 | `scripts/build_doc.py` | `content.json` → 서식이 고정된 `doc.html` |
 | `scripts/sermon_tags.py` | 설교 활용 태그(설교연결도·관련본문·원어·주제·삶·예화 카드) 검사와 고정 표기 — Drive 전문 검색용 |
 | `scripts/render_visuals.py` | 요약 다이어그램 명세 → PNG (헤드리스 Chrome/Edge). 손글씨 노트/깔끔한 도식 스타일, 레이아웃 자동 점검 |
-| `config/categories.json` | 15대 카테고리(범위·Drive 폴더 ID). 14.기타통합은 마지막에 고르는 나머지 분류 |
+| `config/categories.json` | 15대 카테고리(이름·Drive 폴더명·범위). 14.기타통합은 마지막에 고르는 나머지 분류 |
+| `config/drive.local.json` | 내 Drive의 루트·카테고리 폴더 ID (사람마다 다름, git 제외). `scripts/drive_ids.py show`로 확인 |
+| `scripts/drive_ids.py` | `drive.local.json` 읽기·쓰기 (`show` · `set-root <ID>` · `set <카테고리> <ID>`) |
 | `work/` | 작업 산출물 (git 제외) |
 
 ## 수동 실행
