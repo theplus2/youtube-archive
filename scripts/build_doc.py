@@ -27,7 +27,9 @@ content.json 스키마:
   ],
   "cleanup": true,                    # mode A / dual. false면 교정 없이 원문
   "corrections": [["자막 원문", "교정"], ...],   # 선택. 문서 끝 '주요 교정 어휘' 표
-  "notes": ["문서 상단 '읽기 전에' 상자에 넣을 문구(선택)"]
+  "notes": ["문서 상단 '읽기 전에' 상자에 넣을 문구(선택)"],
+  "sermon": {"level": "상", ...},     # 필수. 설교 활용 태그 — 형식은 sermon_tags.py 상단 주석 참조
+  "source": {"channel": "...", "title": "...", "url": "..."}   # 선택. 남의 영상을 다시 올린 경우 원 출처
 }
 """
 import base64
@@ -42,9 +44,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import clean_transcript  # noqa: E402
 import render_visuals  # noqa: E402
+import sermon_tags  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "5.5.0"
+VERSION = "5.6.0"
 
 # ---------- 디자인 토큰 (Google Docs HTML 가져오기에서 살아남는 속성만 사용) ----------
 INK, MUTED, FAINT = "#202124", "#5f6368", "#9aa0a6"
@@ -59,6 +62,7 @@ SMALL = f"{FONT}color:{MUTED};font-size:9.5pt;line-height:1.5;margin-top:0;margi
 KICKER = f"{FONT}color:{ACCENT};font-size:10pt;font-weight:bold;line-height:1.4;margin-top:0;margin-bottom:4pt;"
 H1 = f"{BASE}font-size:19pt;font-weight:bold;line-height:1.35;margin-top:0;margin-bottom:14pt;"
 H2 = f"{FONT}color:{ACCENT};font-size:15pt;font-weight:bold;line-height:1.4;margin-top:26pt;margin-bottom:4pt;" + "page-break-after:avoid;"  # Docs에서 "다음 문단과 함께 유지"
+H2_TAG = H2.replace("margin-top:26pt;", "margin-top:16pt;")
 H3 = f"{BASE}font-size:12.5pt;font-weight:bold;line-height:1.4;margin-top:18pt;margin-bottom:4pt;" + "page-break-after:avoid;"  # Docs에서 "다음 문단과 함께 유지"
 TABLE = "border-collapse:collapse;width:100%;"
 CELL = f"{BASE}font-size:10pt;line-height:1.5;padding:5pt 8pt;border:1px solid {LINE};vertical-align:top;text-align:left;"
@@ -198,9 +202,37 @@ def main():
         ("게시일 · 길이", e(f"{up}  ·  {duration_ko(meta['duration'])}" if meta.get("duration") else up)),
         ("전사 출처", e(kind)),
     ]
+    src = content.get("source")
+    if src:   # 다른 사람의 영상을 다시 올린 경우: 설교에서 인용할 수 있게 원 출처를 남긴다
+        if not isinstance(src, dict) or not (src.get("channel") or src.get("title")):
+            die('source는 {"channel": "원 채널", "title": "원 영상 제목", "url": "원 링크(알면)"} 형식')
+        parts = [e(src.get("channel") or "-"), e(src.get("title") or "-")]
+        if src.get("url"):
+            parts.append(f'<a href="{e(src["url"])}"><span style="color:{ACCENT};">{e(src["url"])}</span></a>')
+        rows.append(("원본 출처", " / ".join(parts)))
     b.append(f'<table style="{TABLE}">'
              + "".join(f'<tr><td style="{LABEL}">{k}</td><td style="{CELL}">{v}</td></tr>' for k, v in rows)
              + "</table>")
+
+    # ---------- 설교 활용 태그 (Drive 전문 검색용 고정 표기) ----------
+    tp_txt = work / "transcript.txt"
+    t_rows, cards, t_errs, t_warns = sermon_tags.build(
+        content.get("sermon"), meta.get("duration"), tp_txt.read_text(encoding="utf-8") if tp_txt.exists() else "")
+    if t_errs:
+        die("설교 활용 태그 오류:\n  - " + "\n  - ".join(t_errs))
+    for w in t_warns:
+        print(f"[주의] 설교 활용 태그: {w}", file=sys.stderr)
+    b.append(f'<h2 style="{H2_TAG}">설교 활용 태그</h2>')
+    b.append(f'<table style="{TABLE}"><tr><td style="{TH}width:20%;">항목</td><td style="{TH}">내용</td></tr>'
+             + "".join(f'<tr><td style="{LABEL}">{k}</td><td style="{CELL}">{"<br>".join(e(x) for x in v)}</td></tr>'
+                       for k, v in t_rows)
+             + "</table>")
+    for i, c in enumerate(cards, 1):
+        b.append(f'<h3 style="{H3}">예화 카드 {i}: {e(c["title"])}</h3>')
+        when = short(c["start"], long_video) + " 부근"
+        for k, v in (("장면", e(c["scene"])), ("핵심 사실", e(c["facts"])),
+                     ("시각", link(c["start"], when) if has_ts else e(when)), ("연결 가능 주제", e(c["link_tags"]))):
+            b.append(p(f"• <b>{k}:</b> {v}", P + "margin-bottom:3pt;"))
 
     notes = list(content.get("notes") or [])
     if mode in ("A", "dual"):

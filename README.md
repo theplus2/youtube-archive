@@ -14,6 +14,9 @@ https://youtu.be/... 전문과 시각화 자료 둘 다                   ← �
 https://www.youtube.com/playlist?list=... 재생목록 전체 아카이빙해줘 ← 영상마다 문서 1개
 ```
 
+모든 문서 머리에는 **설교 활용 태그** 표(`본문: 히브리서 11:1 (히 11:1)`, `주제: 고난`, `삶: 불안` 같은 고정 표기)와 예화 카드가 들어간다.
+Drive 검색창에 `"주제: 고난"`처럼 따옴표로 넣으면 설교 준비 때 관련 아카이브를 찾을 수 있다.
+
 재생목록은 영상 목록을 먼저 받아 처리할 영상 수와 이미 아카이빙된 영상을 알려 준 뒤, 확인을 받고 영상마다 문서를 하나씩 만든다.
 
 필요 조건: Google Drive 커넥터 연결, 네트워크 정책이 `youtube.com` · `pypi.org` · `generativelanguage.googleapis.com` 허용.
@@ -57,6 +60,7 @@ pip install -r requirements.txt
 | `scripts/yt_fetch.py` | 메타데이터·자막 추출 → `work/<ID>/` |
 | `scripts/clean_transcript.py` | 전문 교정: 자막 청크 분할(`prep`) · 교정본 누락 검사(`check`) |
 | `scripts/build_doc.py` | `content.json` → 서식이 고정된 `doc.html` |
+| `scripts/sermon_tags.py` | 설교 활용 태그(설교연결도·관련본문·원어·주제·삶·예화 카드) 검사와 고정 표기 — Drive 전문 검색용 |
 | `scripts/render_visuals.py` | 요약 다이어그램 명세 → PNG (헤드리스 Chrome/Edge). 손글씨 노트/깔끔한 도식 스타일, 레이아웃 자동 점검 |
 | `config/categories.json` | 14대 카테고리, Drive 폴더 ID 캐시 |
 | `work/` | 작업 산출물 (git 제외) |
