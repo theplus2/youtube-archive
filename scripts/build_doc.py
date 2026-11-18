@@ -48,7 +48,7 @@ import drive_ids  # noqa: E402
 import render_visuals  # noqa: E402
 import sermon_tags  # noqa: E402
 
-VERSION = "5.8.0"
+VERSION = "5.10.0"
 
 # ---------- 디자인 토큰 (Google Docs HTML 가져오기에서 살아남는 속성만 사용) ----------
 INK, MUTED, FAINT = "#202124", "#5f6368", "#9aa0a6"
